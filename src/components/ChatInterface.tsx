@@ -6,6 +6,9 @@ import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import { generateTaxResponse } from '../services/gemini';
 import { useToast } from "@/components/ui/use-toast";
+import { motion } from 'framer-motion';
+import { Trash2, RefreshCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const WELCOME_MESSAGE: Message = {
   id: 'welcome',
@@ -15,9 +18,17 @@ const WELCOME_MESSAGE: Message = {
   sources: []
 };
 
+const EXAMPLE_QUESTIONS = [
+  "What are the standard tax deductions for 2023?",
+  "How do I calculate capital gains tax?",
+  "What's the difference between tax credits and deductions?",
+  "When is the tax filing deadline for 2024?"
+];
+
 const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationStarted, setConversationStarted] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -30,6 +41,9 @@ const ChatInterface = () => {
     };
     
     setMessages(prevMessages => [...prevMessages, newMessage]);
+    if (!conversationStarted) {
+      setConversationStarted(true);
+    }
     return newMessage;
   };
 
@@ -95,6 +109,19 @@ const ChatInterface = () => {
     }
   };
 
+  const handleExampleClick = (question: string) => {
+    handleSendMessage(question);
+  };
+
+  const clearChat = () => {
+    setMessages([WELCOME_MESSAGE]);
+    setConversationStarted(false);
+    toast({
+      title: "Chat cleared",
+      description: "Your conversation has been reset.",
+    });
+  };
+
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -103,6 +130,20 @@ const ChatInterface = () => {
 
   return (
     <div className="h-full flex flex-col">
+      <div className="flex justify-end px-4 pt-2">
+        {messages.length > 1 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearChat}
+            className="text-xs text-gray-500 hover:text-red-500 flex items-center gap-1"
+          >
+            <Trash2 size={14} />
+            <span>Clear chat</span>
+          </Button>
+        )}
+      </div>
+      
       <div 
         ref={chatContainerRef}
         className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
@@ -113,6 +154,31 @@ const ChatInterface = () => {
           ))}
         </div>
       </div>
+      
+      {!conversationStarted && (
+        <div className="px-4 pb-4">
+          <p className="text-sm text-center text-gray-500 mb-3">Try asking about:</p>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {EXAMPLE_QUESTIONS.map((question, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleExampleClick(question)}
+                  className="text-xs bg-white hover:bg-siemens-primary/10 border-siemens-primary/30 text-siemens-primary hover:text-siemens-tertiary"
+                >
+                  {question}
+                </Button>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
       
       <div className="p-4 border-t border-gray-100 bg-gradient-to-b from-transparent to-white">
         <MessageInput onSendMessage={handleSendMessage} isLoading={isLoading} />
