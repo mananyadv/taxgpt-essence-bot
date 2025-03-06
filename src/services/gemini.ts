@@ -1,27 +1,20 @@
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Message, Source } from "../types/chat";
 
-// Updated Gemini API key
-const API_KEY = "AIzaSyC9Yaru_7LSlFf_XCbRsOKwwHOgGVI8gFs";
-const API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent";
+// Use the provided API key
+const API_KEY = "AIzaSyD9nyPo2MswHHASsdKYkLFdhw9ViJC6S7U";
 
-interface GeminiResponse {
-  candidates: {
-    content: {
-      parts: {
-        text: string;
-      }[];
-    };
-  }[];
-}
+// Initialize the Generative AI client
+const genAI = new GoogleGenerativeAI(API_KEY);
 
 export const generateTaxResponse = async (messages: Message[]): Promise<{ content: string; sources: Source[] }> => {
   try {
+    // Get the model - using gemini-1.5-flash for better performance
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
     // Extract only the content from previous messages to build context
-    const conversationHistory = messages.map(msg => ({
-      role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }]
-    }));
+    const lastUserMessage = messages.filter(msg => msg.role === 'user').pop()?.content || "";
     
     // Add system prompt to guide the AI
     const systemPrompt = `You are TaxBot, a helpful tax assistant specialized in providing accurate tax information. 
@@ -40,45 +33,13 @@ export const generateTaxResponse = async (messages: Message[]): Promise<{ conten
       Focus specifically on tax-related queries and provide the most up-to-date information.
       Use a professional, friendly tone.`;
     
-    // Get the last user message
-    const lastUserMessage = messages.filter(msg => msg.role === 'user').pop()?.content || "";
+    const prompt = `${systemPrompt}\n\nUser query: ${lastUserMessage}`;
     
-    const payload = {
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: `${systemPrompt}\n\nUser query: ${lastUserMessage}` }]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 2048,
-      },
-    };
-
-    console.log("Sending request to Gemini API:", JSON.stringify(payload, null, 2));
+    console.log("Sending request to Gemini API with prompt:", prompt);
     
-    const response = await fetch(`${API_URL}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error:', errorText);
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json() as GeminiResponse;
-    
-    if (!data.candidates || data.candidates.length === 0) {
-      throw new Error('No response from Gemini API');
-    }
-
-    const textResponse = data.candidates[0].content.parts[0].text;
+    // Generate content using the new API
+    const result = await model.generateContent(prompt);
+    const textResponse = result.response.text();
     
     // Parse out the sources from the response
     let mainContent = textResponse;
